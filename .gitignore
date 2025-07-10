@@ -1,0 +1,6 @@
+# Ignorar archivos generados
+/auth/
+/tmp/
+/store.json
+/settings.json
+/node_modules/
