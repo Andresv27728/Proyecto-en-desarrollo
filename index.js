@@ -1,11 +1,13 @@
 const { Boom } = require('@hapi/boom');
+const baileys = require('@whiskeysockets/baileys');
 const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  makeInMemoryStore,
-} = require('@whiskeysockets/baileys');
+} = baileys;
+const makeInMemoryStore = baileys.makeInMemoryStore?.default || baileys.makeInMemoryStore;
+
 const pino = require('pino');
 const fs = require('fs').promises;
 const fsSync = require('fs');
