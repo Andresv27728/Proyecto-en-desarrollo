@@ -1,9 +1,8 @@
-// plugins/code.js
 module.exports = {
   name: 'code',
   pattern: /^code\s*(\+\d+)?$/i,
   description: 'Genera un código de vinculación para un subbot (enviado a tu chat privado)',
-  async run({ sock, msg, jid, text, sender }) {
+  async run({ sock, msg, jid, text, sender, connectBot, subBots }) { // <--- añadí esto
     const phoneNumber = text.match(/^\+\d+$/)?.[0];
     if (!phoneNumber) {
       await sock.sendMessage(jid, { text: 'Por favor, proporciona un número de teléfono (ejemplo: code +1234567890)' });
