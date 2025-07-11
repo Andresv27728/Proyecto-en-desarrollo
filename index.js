@@ -8,15 +8,11 @@ const {
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
-const qrcode = require('qrcode-terminal');
 const readline = require('readline');
-const { exec } = require('child_process');
-const util = require('util');
-const execPromise = util.promisify(exec);
 
 const logger = pino({ level: 'silent' });
-
 const store = makeInMemoryStore({ logger });
 store.readFromFile('./store.json');
 setInterval(() => store.writeToFile('./store.json'), 10_000);
@@ -33,10 +29,11 @@ const subBots = {};
 const getPhoneNumber = (jid) => jid?.split('@')[0] || 'Desconocido';
 
 let settings = { owners: [] };
+
 async function loadSettings() {
   try {
     settings = JSON.parse(await fs.readFile(settingsFile, 'utf8'));
-  } catch (err) {
+  } catch {
     console.log('No se encontró settings.json, creando uno por defecto...');
     settings = {
       owners: [
@@ -81,9 +78,10 @@ async function loadPlugins() {
       const plugin = require(path.resolve(file));
       if (plugin.name && plugin.run) {
         plugins.set(plugin.name, plugin);
+        console.log(`Plugin cargado: ${plugin.name}`);
       }
     } catch (e) {
-      console.error(`[Error ${file}]: `, e);
+      console.error(`Error al cargar ${file}:`, e);
     }
   }
 }
@@ -110,54 +108,74 @@ async function isOwnerOrAdmin(sock, msg, jid) {
 
 async function connectBot(phoneNumber = null, isSubBot = false, botName = BOT_NAME, msg = null, sender = null) {
   const authPath = path.join(authDir, isSubBot ? `subbot_${botName}` : 'main_bot');
+  if (!fsSync.existsSync(authPath)) fsSync.mkdirSync(authPath, { recursive: true });
+
   const { state, saveCreds } = await useMultiFileAuthState(authPath);
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
     version,
     logger,
-    printQRInTerminal: !phoneNumber && !isSubBot,
-    auth: state,
+    printQRInTerminal: !phoneNumber && !isSubBot && !fsSync.existsSync(path.join(authPath, 'creds.json')),
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, logger),
+    },
     defaultQueryTimeoutMs: 30_000,
+    browser: ['Ubuntu', 'Chrome', '108.0.5359.125'],
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  let pairingCode = null;
-  if (phoneNumber) {
-    pairingCode = await sock.requestPairingCode(phoneNumber);
-    if (isSubBot && msg && sender) {
-      await sock.sendMessage(sender, { text: `Código de vinculación para subbot ${botName}: ${pairingCode}` });
-    } else if (!isSubBot) {
-      console.log(`Código de emparejamiento para ${botName}: ${pairingCode}`);
-    }
-  }
-
-  let connected = false;
   sock.ev.on('connection.update', async (update) => {
-    if (update.connection === 'closed' && !connected) {
-      if (update.lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut) {
+    const { connection, lastDisconnect } = update;
+    const code = (lastDisconnect?.error)?.output?.statusCode;
+
+    if (connection === 'open') {
+      console.log(`${botName}: Conectado!`);
+      if (!isSubBot) store.bind(sock.ev);
+    }
+    if (connection === 'close' && !isSubBot) {
+      console.log(`${botName}: Conexión cerrada. Código:`, code);
+      if (code === DisconnectReason.loggedOut) {
         console.log(`${botName}: Sesión cerrada. Eliminando credenciales...`);
-        await fs.rm(authPath, { recursive: true });
-        if (isSubBot && sender) {
-          await sock.sendMessage(sender, { text: `No fue posible conectar el subbot ${botName}. Sesión eliminada.` });
-          delete subBots[botName];
-        }
+        await fs.rm(authPath, { recursive: true, force: true });
+        process.exit(1);
       } else {
-        console.log(`${botName}: Conexión cerrada. Reconectando...`);
+        console.log(`${botName}: Reconectando...`);
         setTimeout(() => connectBot(phoneNumber, isSubBot, botName, msg, sender), 5000);
       }
-    } else if (update.connection === 'open') {
-      console.log(`${botName}: Conectado!`);
-      connected = true;
-      if (!isSubBot) store.bind(sock.ev);
     }
   });
 
+  if (phoneNumber) {
+    setTimeout(async () => {
+      try {
+        if (typeof sock.requestPairingCode === 'function') {
+          const code = await sock.requestPairingCode(phoneNumber);
+          if (isSubBot && msg && sender) {
+            await sock.sendMessage(sender, { text: `Código de vinculación para subbot ${botName}: ${code}` });
+          } else {
+            console.log(`Código de emparejamiento para ${botName}: ${code}`);
+          }
+          console.log('WhatsApp > Dispositivos vinculados > Vincular > Usar código');
+        } else {
+          console.log('requestPairingCode no está disponible en esta versión de baileys.');
+        }
+      } catch (e) {
+        console.error(`Error generando código de emparejamiento para ${botName}:`, e);
+      }
+    }, 2500);
+  }
+
   if (isSubBot && msg && sender) {
+    let connected = false;
+    sock.ev.on('connection.update', (upd) => {
+      if (upd.connection === 'open') connected = true;
+    });
     setTimeout(async () => {
       if (!connected) {
-        await fs.rm(authPath, { recursive: true });
+        await fs.rm(authPath, { recursive: true, force: true });
         await sock.sendMessage(sender, { text: `No fue posible conectar el subbot ${botName} en 30 segundos. Sesión eliminada.` });
         delete subBots[botName];
       }
@@ -178,24 +196,6 @@ async function selectAuthMethod() {
     return phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
   }
   return null;
-}
-
-async function startMainBot() {
-  await fs.mkdir(authDir, { recursive: true });
-  await fs.mkdir(tmpDir, { recursive: true });
-  await loadSettings();
-  await loadPlugins();
-
-  const phoneNumber = await selectAuthMethod();
-  const sock = await connectBot(phoneNumber, false, BOT_NAME);
-  await handleConnection(sock);
-
-  if (process.env.SUBBOT1_PHONE) {
-    subBots['SUBBOT1'] = await connectBot(process.env.SUBBOT1_PHONE, true, `SUBBOT1_${BOT_NAME}`);
-    await handleConnection(subBots['SUBBOT1']);
-  }
-
-  rl.close();
 }
 
 async function handleConnection(sock) {
@@ -241,6 +241,24 @@ async function handleConnection(sock) {
   });
 }
 
+async function startMainBot() {
+  await fs.mkdir(authDir, { recursive: true });
+  await fs.mkdir(tmpDir, { recursive: true });
+  await loadSettings();
+  await loadPlugins();
+
+  const phoneNumber = await selectAuthMethod();
+  const sock = await connectBot(phoneNumber, false, BOT_NAME);
+  await handleConnection(sock);
+
+  if (process.env.SUBBOT1_PHONE) {
+    subBots['SUBBOT1'] = await connectBot(process.env.SUBBOT1_PHONE, true, `SUBBOT1_${BOT_NAME}`);
+    await handleConnection(subBots['SUBBOT1']);
+  }
+
+  rl.close();
+}
+
 startMainBot().catch((err) => {
   console.error(`Error al iniciar ${BOT_NAME}:`, err);
   rl.close();
@@ -249,3 +267,15 @@ startMainBot().catch((err) => {
 process.on('unhandledRejection', (err) => {
   console.error('Error no manejado:', err);
 });
+
+// Helper function para hacer cache de keys (usada arriba)
+function makeCacheableSignalKeyStore(keys, logger) {
+  const store = new Map(Object.entries(keys || {}));
+  return {
+    get: (key) => store.get(key),
+    set: (key, value) => store.set(key, value),
+    delete: (key) => store.delete(key),
+    isTrusted: (key) => true,
+    logger,
+  };
+}
