@@ -81,10 +81,9 @@ async function loadPlugins() {
       const plugin = require(path.resolve(file));
       if (plugin.name && plugin.run) {
         plugins.set(plugin.name, plugin);
-        console.log(`Plugin cargado: ${plugin.name}`);
       }
     } catch (e) {
-      console.error(`Error al cargar ${file}:`, e);
+      console.error(`[Error ${file}]: `, e);
     }
   }
 }
