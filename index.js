@@ -7,21 +7,13 @@ const {
   fetchLatestBaileysVersion,
 } = baileys;
 
-// Importa el store así:
-const makeInMemoryStore = require('@whiskeysockets/baileys/lib/Stores/inMemory')?.makeInMemoryStore
-
 const pino = require('pino');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const readline = require('readline');
 
-if (!makeInMemoryStore) throw new Error('No se pudo cargar makeInMemoryStore');
-
 const logger = pino({ level: 'silent' });
-const store = makeInMemoryStore({ logger });
-store.readFromFile('./store.json');
-setInterval(() => store.writeToFile('./store.json'), 10_000);
 
 const authDir = './auth';
 const pluginsDir = './plugins';
@@ -112,6 +104,18 @@ async function isOwnerOrAdmin(sock, msg, jid) {
   return false;
 }
 
+// Cache simple para keys (reemplaza makeCacheableSignalKeyStore)
+function makeCacheableSignalKeyStore(keys, logger) {
+  const store = new Map(Object.entries(keys || {}));
+  return {
+    get: (key) => store.get(key),
+    set: (key, value) => store.set(key, value),
+    delete: (key) => store.delete(key),
+    isTrusted: () => true,
+    logger,
+  };
+}
+
 async function connectBot(phoneNumber = null, isSubBot = false, botName = BOT_NAME, msg = null, sender = null) {
   const authPath = path.join(authDir, isSubBot ? `subbot_${botName}` : 'main_bot');
   if (!fsSync.existsSync(authPath)) fsSync.mkdirSync(authPath, { recursive: true });
@@ -139,7 +143,6 @@ async function connectBot(phoneNumber = null, isSubBot = false, botName = BOT_NA
 
     if (connection === 'open') {
       console.log(`${botName}: Conectado!`);
-      if (!isSubBot) store.bind(sock.ev);
     }
     if (connection === 'close' && !isSubBot) {
       console.log(`${botName}: Conexión cerrada. Código:`, code);
@@ -273,15 +276,3 @@ startMainBot().catch((err) => {
 process.on('unhandledRejection', (err) => {
   console.error('Error no manejado:', err);
 });
-
-// Helper function para hacer cache de keys (usada arriba)
-function makeCacheableSignalKeyStore(keys, logger) {
-  const store = new Map(Object.entries(keys || {}));
-  return {
-    get: (key) => store.get(key),
-    set: (key, value) => store.set(key, value),
-    delete: (key) => store.delete(key),
-    isTrusted: (key) => true,
-    logger,
-  };
-}
