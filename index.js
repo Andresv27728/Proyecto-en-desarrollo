@@ -6,7 +6,15 @@ const {
   DisconnectReason,
   fetchLatestBaileysVersion,
 } = baileys;
-const makeInMemoryStore = baileys.makeInMemoryStore?.default || baileys.makeInMemoryStore;
+
+// Esta línea la hacemos así para evitar el error de "no es función"
+let makeInMemoryStore;
+try {
+  makeInMemoryStore = require('@whiskeysockets/baileys/lib/store').default;
+} catch {
+  // fallback si no existe ahí
+  makeInMemoryStore = baileys.makeInMemoryStore || (() => { throw new Error('No se pudo cargar makeInMemoryStore'); });
+}
 
 const pino = require('pino');
 const fs = require('fs').promises;
