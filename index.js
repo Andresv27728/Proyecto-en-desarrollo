@@ -1,4 +1,3 @@
-// index.js - ✧ ೃ 𝐒𝐘𝐀 𝐓𝐄𝐀𝐌 ೃ ✧ Bot de WhatsApp optimizado
 const { Boom } = require('@hapi/boom');
 const {
   default: makeWASocket,
@@ -16,29 +15,23 @@ const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
 
-// Configuración de logger optimizado
 const logger = pino({ level: 'silent' });
 
-// Almacenamiento en memoria
 const store = makeInMemoryStore({ logger });
 store.readFromFile('./store.json');
 setInterval(() => store.writeToFile('./store.json'), 10_000);
 
-// Directorios y archivos
 const authDir = './auth';
 const pluginsDir = './plugins';
 const tmpDir = './tmp';
 const settingsFile = './settings.json';
 const BOT_NAME = '✧ ೃ 𝐒𝐘𝐀 𝐓𝐄𝐀𝐌 ೃ ✧';
 
-// Límite de subbots
 const MAX_SUBBOTS = 30;
 const subBots = {};
 
-// Utilidad para extraer número de teléfono desde jid
 const getPhoneNumber = (jid) => jid?.split('@')[0] || 'Desconocido';
 
-// Cargar configuración
 let settings = { owners: [] };
 async function loadSettings() {
   try {
@@ -53,13 +46,12 @@ async function loadSettings() {
         '',
         ''
       ],
-      cleanupInterval: 24 * 60 * 60 * 1000, // 24 horas
+      cleanupInterval: 24 * 60 * 60 * 1000,
     };
     await fs.writeFile(settingsFile, JSON.stringify(settings, null, 2));
   }
 }
 
-// Limpieza de archivos temporales
 async function cleanupTmp() {
   try {
     await fs.mkdir(tmpDir, { recursive: true });
@@ -79,7 +71,6 @@ async function cleanupTmp() {
 }
 setInterval(cleanupTmp, settings.cleanupInterval || 24 * 60 * 60 * 1000);
 
-// Sistema de plugins
 const plugins = new Map();
 async function loadPlugins() {
   await fs.mkdir(pluginsDir, { recursive: true });
@@ -96,17 +87,14 @@ async function loadPlugins() {
   }
 }
 
-// Interfaz para consola
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 const question = (query) => new Promise((resolve) => rl.question(query, resolve));
 
-// Estado del bot
 let botEnabled = true;
 
-// Verificar si el usuario es owner o admin
 async function isOwnerOrAdmin(sock, msg, jid) {
   const sender = msg.key.participant || msg.key.remoteJid;
   if (settings.owners.includes(sender)) return true;
@@ -119,7 +107,6 @@ async function isOwnerOrAdmin(sock, msg, jid) {
   return false;
 }
 
-// Conectar bot (principal o subbot)
 async function connectBot(phoneNumber = null, isSubBot = false, botName = BOT_NAME, msg = null, sender = null) {
   const authPath = path.join(authDir, isSubBot ? `subbot_${botName}` : 'main_bot');
   const { state, saveCreds } = await useMultiFileAuthState(authPath);
@@ -133,10 +120,8 @@ async function connectBot(phoneNumber = null, isSubBot = false, botName = BOT_NA
     defaultQueryTimeoutMs: 30_000,
   });
 
-  // Guardar credenciales
   sock.ev.on('creds.update', saveCreds);
 
-  // Generar código de emparejamiento
   let pairingCode = null;
   if (phoneNumber) {
     pairingCode = await sock.requestPairingCode(phoneNumber);
@@ -147,7 +132,6 @@ async function connectBot(phoneNumber = null, isSubBot = false, botName = BOT_NA
     }
   }
 
-  // Manejo de conexión
   let connected = false;
   sock.ev.on('connection.update', async (update) => {
     if (update.connection === 'closed' && !connected) {
@@ -169,7 +153,6 @@ async function connectBot(phoneNumber = null, isSubBot = false, botName = BOT_NA
     }
   });
 
-  // Timeout de conexión para subbots
   if (isSubBot && msg && sender) {
     setTimeout(async () => {
       if (!connected) {
@@ -183,7 +166,6 @@ async function connectBot(phoneNumber = null, isSubBot = false, botName = BOT_NA
   return sock;
 }
 
-// Selección de autenticación para bot principal
 async function selectAuthMethod() {
   console.log(`Selecciona el método de autenticación para ${BOT_NAME}:`);
   console.log('1. Código QR');
@@ -197,7 +179,6 @@ async function selectAuthMethod() {
   return null;
 }
 
-// Iniciar bot principal
 async function startMainBot() {
   await fs.mkdir(authDir, { recursive: true });
   await fs.mkdir(tmpDir, { recursive: true });
@@ -208,7 +189,6 @@ async function startMainBot() {
   const sock = await connectBot(phoneNumber, false, BOT_NAME);
   await handleConnection(sock);
 
-  // Iniciar subbots desde .env
   if (process.env.SUBBOT1_PHONE) {
     subBots['SUBBOT1'] = await connectBot(process.env.SUBBOT1_PHONE, true, `SUBBOT1_${BOT_NAME}`);
     await handleConnection(subBots['SUBBOT1']);
@@ -217,18 +197,17 @@ async function startMainBot() {
   rl.close();
 }
 
-// Manejo de mensajes
 async function handleConnection(sock) {
   sock.ev.on('messages.upsert', async ({ messages }) => {
     for (const msg of messages) {
       if (!msg.message || msg.key.fromMe) continue;
-      const jid = msg.key.remoteJid; // LID del chat
-      const sender = msg.key.participant || msg.key.remoteJid; // LID del remitente
+      const jid = msg.key.remoteJid;
+      const sender = msg.key.participant || msg.key.remoteJid;
       const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-      const mentionedJids = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || []; // LIDs mencionados (@lid)
+      const mentionedJids = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
 
       if (!botEnabled && !(await isOwnerOrAdmin(sock, msg, jid))) {
-        continue; // Bot desactivado, solo owners/admins pueden usarlo
+        continue;
       }
 
       for (const [name, plugin] of plugins) {
@@ -238,7 +217,19 @@ async function handleConnection(sock) {
             continue;
           }
           try {
-            await plugin.run({ sock, msg, jid, text, tmpDir, plugins, sender, mentionedJids, getPhoneNumber });
+            await plugin.run({
+              sock,
+              msg,
+              jid,
+              text,
+              tmpDir,
+              plugins,
+              sender,
+              mentionedJids,
+              getPhoneNumber,
+              connectBot,
+              subBots
+            });
           } catch (err) {
             console.error(`Error en plugin ${name}:`, err);
             await sock.sendMessage(jid, { text: 'Error al ejecutar el comando.' });
@@ -249,13 +240,11 @@ async function handleConnection(sock) {
   });
 }
 
-// Iniciar bot
 startMainBot().catch((err) => {
   console.error(`Error al iniciar ${BOT_NAME}:`, err);
   rl.close();
 });
 
-// Manejo de errores global
 process.on('unhandledRejection', (err) => {
   console.error('Error no manejado:', err);
 });
