@@ -42,9 +42,7 @@ async function loadSettings() {
       owners: [
         '176742836768966@s.whatsapp.net',
         '573133374132',
-        '',
-        '',
-        ''
+        '', '', ''
       ],
       cleanupInterval: 24 * 60 * 60 * 1000,
     };
@@ -79,10 +77,14 @@ async function loadPlugins() {
     .map((dirent) => path.join(pluginsDir, dirent.name));
 
   for (const file of pluginFiles) {
-    const plugin = require(file);
-    if (plugin.name && plugin.run) {
-      plugins.set(plugin.name, plugin);
-      console.log(`Plugin cargado: ${plugin.name}`);
+    try {
+      const plugin = require(path.resolve(file));
+      if (plugin.name && plugin.run) {
+        plugins.set(plugin.name, plugin);
+        console.log(`Plugin cargado: ${plugin.name}`);
+      }
+    } catch (e) {
+      console.error(`Error al cargar ${file}:`, e);
     }
   }
 }
