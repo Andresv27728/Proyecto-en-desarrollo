@@ -7,20 +7,16 @@ const {
   fetchLatestBaileysVersion,
 } = baileys;
 
-// Esta línea la hacemos así para evitar el error de "no es función"
-let makeInMemoryStore;
-try {
-  makeInMemoryStore = require('@whiskeysockets/baileys/lib/store').default;
-} catch {
-  // fallback si no existe ahí
-  makeInMemoryStore = baileys.makeInMemoryStore || (() => { throw new Error('No se pudo cargar makeInMemoryStore'); });
-}
+// Importa el store así:
+const makeInMemoryStore = require('@whiskeysockets/baileys/lib/Stores/inMemory')?.makeInMemoryStore
 
 const pino = require('pino');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const readline = require('readline');
+
+if (!makeInMemoryStore) throw new Error('No se pudo cargar makeInMemoryStore');
 
 const logger = pino({ level: 'silent' });
 const store = makeInMemoryStore({ logger });
