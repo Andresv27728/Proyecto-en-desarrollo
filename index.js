@@ -1,5 +1,5 @@
 const { Boom } = require('@hapi/boom');
-const baileys = require('@whiskeysockets/baileys');
+const baileys = require('@soymaycol/maybailyes');
 const {
   default: makeWASocket,
   useMultiFileAuthState,
