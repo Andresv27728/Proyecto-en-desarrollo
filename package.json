@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.6",
+    "@whiskeysockets/baileys": "github:SYA-TEAM/Bai",
     "axios": "^1.6.8",
     "pino": "^8.20.0",
     "qrcode-terminal": "^0.12.0"
