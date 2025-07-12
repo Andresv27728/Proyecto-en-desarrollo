@@ -1,0 +1,16 @@
+{
+  "name": "sya-team-bot",
+  "version": "1.0.0",
+  "description": "Bot de WhatsApp ✧ ೃ 𝐒𝐘𝐀 𝐓𝐄𝐀𝐌 ೃ ✧",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "latest",
+    "pino": "^8.20.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "author": "Andresv27728",
+  "license": "MIT"
+}
