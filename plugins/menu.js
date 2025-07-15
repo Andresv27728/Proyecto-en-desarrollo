@@ -1,16 +1,13 @@
-// plugins/menu.js
-module.exports = {
-  name: 'menu',
-  pattern: /^menu$/i,
-  description: 'Muestra la lista de comandos disponibles',
-  async run({ sock, msg, jid, plugins }) {
-    let menuText = `📋 *Menú de ${BOT_NAME}*\n\n`;
-    for (const [name, plugin] of plugins) {
-      const description = plugin.description || 'Sin descripción';
-      const restricted = plugin.owner ? ' (Owner/Admin)' : '';
-      menuText += `🔹 *${name}*: ${description}${restricted}\n`;
-    }
-    menuText += `\nEscribe un comando para usarlo (ejemplo: menu, play <url>)`;
-    await sock.sendMessage(jid, { text: menuText });
-  },
-};
+export default {
+  name: 'menú',
+  description: 'Muestra el menú de comandos',
+  execute: async (sock, msg, args) => {
+    const menu = `
+*Menú de comandos:*
+- menú: Muestra este menú
+- hola: Saluda
+- info: Información del bot
+    `
+    await sock.sendMessage(msg.key.remoteJid, { text: menu })
+  }
+}
