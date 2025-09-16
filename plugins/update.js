@@ -1,16 +1,16 @@
 // plugins/update.js
-const { exec } = require('child_process');
-const util = require('util');
+import { exec } from 'child_process';
+import util from 'util';
 const execPromise = util.promisify(exec);
 
-module.exports = {
+export default {
   name: 'update',
-  pattern: /^update$/i,
   owner: true,
   description: 'Actualiza el bot desde GitHub',
-  async run({ sock, msg, jid }) {
+  execute: async (sock, msg, args) => {
+    const jid = msg.key.remoteJid;
     try {
-      await sock.sendMessage(jid, { text: `Actualizando ${BOT_NAME} desde GitHub...` });
+      await sock.sendMessage(jid, { text: `Actualizando bot desde GitHub...` });
       await execPromise('git pull origin main');
       await sock.sendMessage(jid, { text: 'Bot actualizado. Reinicia para aplicar cambios.' });
     } catch (err) {

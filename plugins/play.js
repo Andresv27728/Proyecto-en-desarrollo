@@ -1,21 +1,27 @@
 // plugins/play.js
-const fs = require('fs').promises;
-const path = require('path');
-const axios = require('axios');
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
+import axios from 'axios';
 
-module.exports = {
+export default {
   name: 'play',
-  pattern: /^play\s+(.+)$/i,
   description: 'Descarga un video de YouTube usando APIs gratuitas (YT1s, DDownr, SocialPlug)',
-  async run({ sock, msg, jid, text, tmpDir }) {
-    const query = text.match(/^play\s+(.+)$/i)?.[1];
-    if (!query) {
+  execute: async (sock, msg, args) => {
+    const jid = msg.key.remoteJid;
+    const text = msg.message.conversation;
+    const query = text.substring(text.indexOf(' ') + 1);
+
+    if (!query || query.toLowerCase() === 'play') {
       await sock.sendMessage(jid, { text: 'Proporciona un enlace o nombre de video (ejemplo: play https://youtube.com/... o play nombre canción)' });
       return;
     }
 
+    let tmpDir;
     try {
       await sock.sendMessage(jid, { text: 'Buscando y descargando video...' });
+
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'whatsapp-bot-'));
 
       // Buscar video en YouTube (si no es un enlace directo)
       let url = query;
@@ -100,6 +106,10 @@ module.exports = {
       });
     } catch (err) {
       await sock.sendMessage(jid, { text: `Error: ${err.message}` });
+    } finally {
+        if (tmpDir) {
+            await fs.rm(tmpDir, { recursive: true, force: true });
+        }
     }
   },
 };
