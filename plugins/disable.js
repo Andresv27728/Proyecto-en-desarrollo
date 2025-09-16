@@ -1,11 +1,12 @@
 // plugins/disable.js
-module.exports = {
+export default {
   name: 'disable',
-  pattern: /^disable$/i,
   owner: true,
   description: 'Desactiva el bot para usuarios no privilegiados',
-  async run({ sock, msg, jid }) {
-    botEnabled = false;
-    await sock.sendMessage(jid, { text: `${BOT_NAME} desactivado.` });
+  execute: async (sock, msg, args) => {
+    const jid = msg.key.remoteJid;
+    // This assumes botEnabled is a global variable managed in main.js
+    global.botEnabled = false;
+    await sock.sendMessage(jid, { text: `Bot desactivado.` });
   },
 };

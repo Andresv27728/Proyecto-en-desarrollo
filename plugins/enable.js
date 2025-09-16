@@ -1,11 +1,12 @@
 // plugins/enable.js
-module.exports = {
+export default {
   name: 'enable',
-  pattern: /^enable$/i,
   owner: true,
   description: 'Activa el bot para todos los usuarios',
-  async run({ sock, msg, jid }) {
-    botEnabled = true;
-    await sock.sendMessage(jid, { text: `${BOT_NAME} activado.` });
+  execute: async (sock, msg, args) => {
+    const jid = msg.key.remoteJid;
+    // This assumes botEnabled is a global variable managed in main.js
+    global.botEnabled = true;
+    await sock.sendMessage(jid, { text: `Bot activado.` });
   },
 };

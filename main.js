@@ -14,6 +14,8 @@ for (const file of fs.readdirSync(pluginsDir)) {
   }
 }
 
+global.botEnabled = true;
+
 async function startBot() {
   console.log('Iniciando conexión con WhatsApp...')
 
@@ -47,6 +49,18 @@ async function startBot() {
       // Buscar plugin cuyo nombre coincida con el mensaje
       const plugin = plugins.get(text)
       if (plugin) {
+        // Check if bot is disabled
+        if (!global.botEnabled && !plugin.owner) {
+          return;
+        }
+
+        // A simple owner check
+        const ownerJid = 'your_jid_here@s.whatsapp.net'; // TODO: Make this configurable
+        if (plugin.owner && msg.key.remoteJid !== ownerJid) {
+            await sock.sendMessage(msg.key.remoteJid, { text: 'Este comando es solo para el propietario del bot.' });
+            return;
+        }
+
         try {
           await plugin.execute(sock, msg, [])
         } catch (err) {
